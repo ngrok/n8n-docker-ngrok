@@ -6,7 +6,7 @@ Use this repository as a starting point and adapt it to your own security, backu
 
 ## Requirements
 
-- Docker Engine 25 or later and Docker Compose 2.20.2 or later (including Compose v5).
+- Docker Engine 28 or later and Docker Compose 2.20.2 or later (including Compose v5).
 - Docker configured to start automatically: at sign-in with Docker Desktop, or at boot with Docker Engine on Linux.
 - An ngrok account on the free plan.
 - Optional: [just](https://github.com/casey/just) for running commands.
@@ -15,67 +15,83 @@ Use this repository as a starting point and adapt it to your own security, backu
 
 1. Copy the example environment file:
 
-   ```sh
-   cp .env.example .env
-   ```
+    ``` sh
+    cp .env.example .env
+    ```
 
-1. Edit `.env` and replace every `CHANGE_ME` value. Use unique random values for all passwords, `N8N_ENCRYPTION_KEY`, and `N8N_RUNNERS_AUTH_TOKEN`.
+2. Edit `.env` and replace every `CHANGE_ME` value. Use unique random values for all passwords, `N8N_ENCRYPTION_KEY`, and `N8N_RUNNERS_AUTH_TOKEN`.
 
-   With `just` installed, generate a random password and copy it to the clipboard:
+    With `just` installed, generate a random password and copy it to the clipboard:
 
-   ```sh
-   just password
-   ```
+    ``` sh
+    just pass
+    ```
 
-1. Set both timezone variables:
+3. Set both timezone variables:
 
-   ```sh
-   GENERIC_TIMEZONE="America/Los_Angeles"
-   TZ="America/Los_Angeles"
-   ```
+    ``` sh
+    GENERIC_TIMEZONE="America/Los_Angeles"
+    TZ="America/Los_Angeles"
+    ```
 
-1. Get your auth token and dev domain from the ngrok dashboard, then set the ngrok variables:
+4. Get your auth token and dev domain from the ngrok dashboard, then set the ngrok variables:
 
-   ```sh
-   NGROK_AUTHTOKEN="CHANGE_ME"
-   NGROK_PUBLIC_DOMAIN="CHANGE_ME"
-   ```
+    ``` sh
+    NGROK_AUTHTOKEN="CHANGE_ME"
+    NGROK_PUBLIC_DOMAIN="CHANGE_ME"
+    ```
 
-1. Validate and start the stack:
+5. Validate and start the stack:
 
-   ```sh
-   docker compose config --quiet
-   docker compose up -d
-   ```
+    ``` sh
+    docker compose config --quiet
+    docker compose up -d
+    ```
 
-1. Open `https://<your-ngrok-domain>` and create the n8n owner account.
+6. Open `http://localhost:5678` and create the n8n owner account. Use the ngrok URL for public webhooks and triggers rather than routine editor access.
+
+    If Docker is running on another computer or a cloud VM, `localhost` on your computer refers to your computer, not the machine running n8n. See [How do I access n8n from another computer?](#7-how-do-i-access-the-n8n-editor-from-another-computer) below.
 
 ## Common commands
 
-```sh
+``` sh
 docker compose ps          # Show service status
 docker compose logs -f n8n # Follow n8n logs
 docker compose down        # Stop the stack
 ```
 
-## Operations and maintenance
-
-Size the stack for your workflows and test changes before relying on it. The included limits are conservative starting points for a small personal instance, but workflows that process large files, run Python libraries, or execute in parallel may need different values. See n8n's guidance for [controlling concurrency](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/control-concurrency/), [resolving memory issues](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/fix-memory-issues/), and [monitoring n8n](https://docs.n8n.io/deploy/host-n8n/keep-n8n-running/monitor-n8n/).
-
-Create a backup and maintenance process that you have tested before you need it. A recoverable backup includes the PostgreSQL data, the `n8n_data` volume, and a securely stored copy of `N8N_ENCRYPTION_KEY`. Review n8n's guidance on [updating a self-hosted instance](https://docs.n8n.io/deploy/host-n8n/keep-n8n-running/update-n8n/) and the PostgreSQL documentation on [backup and restore](https://www.postgresql.org/docs/current/backup.html).
-
-- Keep `.env` private and store its secrets in a secrets manager. Ensure `N8N_ENCRYPTION_KEY` can be recovered separately from the host; losing or changing it makes stored credentials unreadable.
-- PostgreSQL only applies initialization settings when its data volume is empty. Changing a database password in `.env` does not update an existing database user.
-- Pin and test updates before applying them. Update `N8N_VERSION` only in `.env` so n8n and its task runner stay on the same version.
-- Setting `PGDATA` keeps this Compose volume path consistent, but PostgreSQL major-version upgrades still require a planned migration.
-
 ## Key implementation details
 
 This setup has four services, each with a specific job. These choices explain much of the configuration:
 
-### Public HTTPS through ngrok
+### Public webhooks through ngrok
 
-ngrok forwards incoming requests to n8n over the Compose network. Your configured domain gives external services a consistent webhook address. n8n and ngrok's inspection interface bind their host ports to `127.0.0.1` (this machine only); PostgreSQL and the runner broker publish no host ports at all.
+ngrok gives external services a consistent public HTTPS address for production and test webhooks, forwarding requests to `n8n:5678` over the Compose network. The editor remains accessible through ngrok; the active Traffic Policy does not restrict the public endpoint to webhook routes.
+
+### Editor access versus webhook access
+
+`N8N_WEBHOOK_URL` tells n8n to generate public webhook and trigger URLs using your ngrok HTTPS domain. External services such as GitHub, Slack, and Telegram can therefore reach workflows through ngrok even when you open the n8n editor directly.
+
+`N8N_EDITOR_BASE_URL` sets localhost as the instance address for generated editor links and frontend telemetry proxy URLs. Recipients of those links need local access or an SSH tunnel. Production and test webhook URLs continue to use ngrok. If you choose a different canonical editor address, update `N8N_EDITOR_BASE_URL` in the Compose file to match.
+
+For routine administration, use a direct connection to the editor where practical. On the machine running Docker, open `http://localhost:5678`. This keeps the editor's frequent API requests from consuming ngrok's monthly HTTP request allowance. The n8n host port is bound to `127.0.0.1`, so it is not directly reachable from other computers by default.
+
+For another computer on a LAN or a cloud VM, retain the localhost-only binding and forward the port over SSH. Run this on your computer, replacing `user@docker-host` with your SSH username and the Docker host's address:
+
+```sh
+ssh -N -o ExitOnForwardFailure=yes \
+  -L 127.0.0.1:5678:127.0.0.1:5678 user@docker-host
+```
+
+Keep the SSH connection open and browse `http://localhost:5678`. This requires SSH access to the Docker host and an available local port 5678. Use a browser that supports secure cookies on localhost; Safari may require HTTPS.
+
+Changing the mapping to `5678:5678` publishes n8n on all host interfaces, potentially including public interfaces. It does not make plain HTTP access through a LAN IP compatible with n8n's default secure cookies. Direct LAN administration needs HTTPS and appropriate network access restrictions, or an explicit decision to weaken cookie security.
+
+Use [Prompt 7](#7-how-do-i-access-the-n8n-editor-from-another-computer) for a walkthrough of these options and their security implications.
+
+The ngrok container does not need the host's published port to reach n8n. It connects directly to `n8n:5678` over the private Compose network, while `N8N_WEBHOOK_URL` supplies the public HTTPS address that n8n uses for externally reachable webhooks.
+
+n8n and ngrok's inspection interface bind their host ports to `127.0.0.1` (this machine only); PostgreSQL and the runner broker publish no host ports at all.
 
 ### Explicit configuration for each service
 
@@ -92,6 +108,17 @@ n8n uses a database account without PostgreSQL superuser privileges. The supplie
 ### Persistence and predictable operation
 
 Named volumes retain database and n8n data when containers are replaced. Health checks control startup order, restart policies help services come back after exits, log rotation limits log growth, and shutdown grace periods allow time to finish work. n8n and its runners share one version setting. Keeping the host and Docker running, testing updates, and maintaining recoverable backups remain part of operating the deployment.
+
+## Operations and maintenance
+
+Size the stack for your workflows and test changes before relying on it. The included limits are conservative starting points for a small personal instance, but workflows that process large files, run Python libraries, or execute in parallel may need different values. See n8n's guidance for [controlling concurrency](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/control-concurrency/), [resolving memory issues](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/fix-memory-issues/), and [monitoring n8n](https://docs.n8n.io/deploy/host-n8n/keep-n8n-running/monitor-n8n/).
+
+Create a backup and maintenance process that you have tested before you need it. A recoverable backup includes the PostgreSQL data, the `n8n_data` volume, and a securely stored copy of `N8N_ENCRYPTION_KEY`. Review n8n's guidance on [updating a self-hosted instance](https://docs.n8n.io/deploy/host-n8n/keep-n8n-running/update-n8n/) and the PostgreSQL documentation on [backup and restore](https://www.postgresql.org/docs/current/backup.html).
+
+- Keep `.env` private and store its secrets in a secrets manager. Ensure `N8N_ENCRYPTION_KEY` can be recovered separately from the host; losing or changing it makes stored credentials unreadable.
+- PostgreSQL only applies initialization settings when its data volume is empty. Changing a database password in `.env` does not update an existing database user.
+- Pin and test updates before applying them. Update `N8N_VERSION` only in `.env` so n8n and its task runner stay on the same version.
+- Setting `PGDATA` keeps this Compose volume path consistent, but PostgreSQL major-version upgrades still require a planned migration.
 
 ## Use AI to explain how this code works
 
@@ -133,4 +160,14 @@ Teach me how to read a Compose file using this one as our example, the way you'd
 
 ```text
 Walk me through diagnosing this stack like you're debugging it live with me, narrating your reasoning rather than handing me a checklist. Start from a few realistic failure stories: a container that won't come up, a webhook that never arrives, an ngrok domain that won't connect, and for each one, tell me what the first symptom would look like, which command you'd reach for first, and how the error message points to the fix. For anything ngrok-specific, check https://ngrok.com/llms.txt, which links to the ERR_NGROK_* error reference and corrects common stale assumptions about ngrok, instead of guessing at the actual message or code. Ground every failure in something that could actually go wrong in this repository, and end with the handful of commands worth remembering for next time. Structure the explanation in digestible chunks with good pedagogical pacing, and use diagrams wherever they'd help.
+```
+
+### 7. How do I access the n8n editor from another computer?
+
+```text
+Teach me why I can open n8n at http://localhost:5678 on the machine running Docker but can't use that address from another computer. Start by explaining that localhost always means the machine making the request, then use this repository to show how the `127.0.0.1:5678:5678` binding, host network interfaces, the Compose network, and `n8n:5678` fit together.
+
+Explain the deliberate split between editor and webhook access: I should administer the editor directly where practical, while `N8N_WEBHOOK_URL` keeps the ngrok HTTPS domain as the public address for external triggers and both production and test webhooks. Explain how `N8N_EDITOR_BASE_URL` keeps generated editor links and frontend telemetry proxy URLs on localhost, and why those links require local access or an SSH tunnel. Make clear why ngrok can reach n8n over the Compose network even though the host port is localhost-only, why the editor remains publicly reachable through ngrok, and why keeping routine editor traffic off ngrok preserves its monthly HTTP request allowance.
+
+Then walk me through the right approach for three situations: the same machine, another computer on a trusted local network, and a cloud VM. For both LAN and cloud administration, recommend retaining the localhost binding and show SSH local port forwarding, including where to run the command and which address to open in the browser. Explain the SSH access and available local port requirements. Cover secure cookies on localhost and the Safari caveat. If discussing direct LAN access as an alternative, explain that `5678:5678` publishes on all interfaces and that HTTP access through a LAN IP does not work with the default secure cookies; cover HTTPS and network restrictions without silently disabling cookie security. Explain when to update `N8N_EDITOR_BASE_URL` for a different editor address. Assume I'm new to Docker and networking. Structure the explanation in digestible chunks with good pedagogical pacing, and use diagrams wherever they'd help.
 ```

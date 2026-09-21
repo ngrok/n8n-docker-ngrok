@@ -8,8 +8,9 @@ pass length='32':
 up:
     docker compose up
 
+up-prod:
+    docker compose up -d
+
 down:
     docker compose down
 
-up-production:
-    docker compose up -d
