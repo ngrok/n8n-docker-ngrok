@@ -31,12 +31,16 @@ services:
       DB_POSTGRESDB_USER: ${POSTGRES_NON_ROOT_USER:?}
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_NON_ROOT_PASSWORD:?}
 
-      # Core
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?}
-      N8N_PROTOCOL: https
-      N8N_HOST: ${NGROK_PUBLIC_DOMAIN:?}
+      # Access
+      # Use localhost for generated editor links and frontend telemetry proxy URLs.
+      # Use public HTTPS for both production and test webhooks.
+      # Trust one reverse proxy hop for requests arriving through ngrok.
+      N8N_EDITOR_BASE_URL: http://localhost:5678
       N8N_WEBHOOK_URL: https://${NGROK_PUBLIC_DOMAIN:?}
       N8N_PROXY_HOPS: 1
+
+      # Core
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?}
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:?}
       TZ: ${TZ:?}
 
