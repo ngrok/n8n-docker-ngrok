@@ -1,6 +1,8 @@
 name: Update n8n release
 
 on:
+  push:
+    branches: [codex/n8n-release-update]
   schedule:
     - cron: '23 20 * * *' # Daily at 20:23 UTC (06:23 Brisbane).
   workflow_dispatch:
@@ -20,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: codex/n8n-release-update
 
       - name: Check the latest stable n8n release
         id: release
@@ -31,7 +33,8 @@ jobs:
       - name: Create or update the version pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
-          branch: codex/update-n8n-version
+          base: codex/n8n-release-update
+          branch: codex/test-n8n-version
           delete-branch: true
           add-paths: .env.example
           commit-message: 'chore: update n8n to ${{ steps.release.outputs.version }}'
