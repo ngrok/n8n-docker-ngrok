@@ -93,6 +93,16 @@ n8n uses a database account without PostgreSQL superuser privileges. The supplie
 
 Named volumes retain database and n8n data when containers are replaced. Health checks control startup order, restart policies help services come back after exits, log rotation limits log growth, and shutdown grace periods allow time to finish work. n8n and its runners share one version setting. Keeping the host and Docker running, testing updates, and maintaining recoverable backups remain part of operating the deployment.
 
+## Automated n8n release updates
+
+The `Update n8n release` GitHub Action checks [n8n's latest stable release](https://github.com/n8n-io/n8n/releases/latest) daily at 20:23 UTC (06:23 Brisbane). It opens or updates a single pull request changing only `N8N_VERSION` in `.env.example`, with a link to the release notes. Drafts and prereleases are rejected, and the version is never downgraded. Major stable releases are included for review; pull requests are not automatically merged.
+
+To enable it, merge the workflow and its script into the default branch and enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**. Organization policy must also permit this setting. The workflow uses the built-in `GITHUB_TOKEN`; no additional secret is needed. You can also run it from **Actions → Update n8n release → Run workflow**. GitHub may delay scheduled runs, and disables scheduled workflows in public repositories after 60 days without repository activity.
+
+Merging an update changes the example for future deployments. Existing deployments still need to update their private `.env` and follow the normal backup and upgrade process. Pull requests created with `GITHUB_TOKEN` do not trigger other `push` or `pull_request` workflows; if you add required PR checks, use a GitHub App token or suitable personal access token for the PR step.
+
+To test the release comparison locally, run `python3 -m unittest discover -s scripts -p 'test_*.py'`.
+
 ## Use AI to explain how this code works
 
 Open this repository using an AI coding assistant, or attach the repository files to a chat session. Use the `.env.example` file, not your private `.env` containing secrets.
