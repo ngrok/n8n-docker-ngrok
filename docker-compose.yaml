@@ -19,6 +19,9 @@ services:
   n8n:
     image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:?}
     restart: unless-stopped
+    networks:
+      - default
+      - search
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,6 +46,16 @@ services:
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?}
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:?}
       TZ: ${TZ:?}
+
+      # Assistant uses Daytona for sandbox execution and private SearXNG for search.
+      N8N_INSTANCE_AI_SANDBOX_ENABLED: "true"
+      N8N_INSTANCE_AI_SANDBOX_PROVIDER: daytona
+      N8N_INSTANCE_AI_SANDBOX_IMAGE: daytonaio/sandbox:0.5.3-slim
+      DAYTONA_API_URL: https://app.daytona.io/api
+      DAYTONA_API_KEY: ${DAYTONA_API_KEY:-}
+      N8N_INSTANCE_AI_MODEL:
+      N8N_INSTANCE_AI_MODEL_API_KEY: ${N8N_INSTANCE_AI_MODEL_API_KEY:-}
+      N8N_INSTANCE_AI_SEARXNG_URL: http://searxng:8080
 
       # Security and hardening
       N8N_BLOCK_ENV_ACCESS_IN_NODE: ${N8N_BLOCK_ENV_ACCESS_IN_NODE:?}
@@ -134,6 +147,44 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  searxng:
+    image: ghcr.io/searxng/searxng:2026.11.21-c6ee3e9fd
+    restart: unless-stopped
+    networks:
+      - search
+    user: searxng
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    cpus: 1.0
+    mem_limit: 512m
+    pids_limit: 128
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?}
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng_cache:/var/cache/searxng
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      start_period: 30s
+      start_interval: 1s
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    stop_grace_period: 30s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  search:
+
 volumes:
   n8n_postgres:
   n8n_data:
+  searxng_cache:
