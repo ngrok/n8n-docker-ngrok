@@ -36,7 +36,17 @@
       <ul>
         <li>n8n and the distroless Code node runners share the 3.0.1 pin. This is an early-access release for a controlled demo. Use a maintained version containing n8n’s 3.2.2 security fixes for public deployments. <a href="https://github.com/n8n-io/n8n/releases/tag/n8n%403.0.1">3.0.1 release</a> · <a href="https://github.com/n8n-io/n8n/security/advisories">Security advisories</a></li>
         <li>Daytona provisions Assistant sandboxes remotely and handles the workflow data Assistant passes to them. The local Compose stack uses zero privileged containers. A Daytona API key and a model provider key activate Assistant. <a href="https://github.com/n8n-io/n8n-docs/blob/main/docs/deploy/host-n8n/configure-n8n/set-up-n8n-assistant.md">n8n Assistant setup guide</a></li>
-        <li>SearXNG has a private network shared with n8n, an HTTP health check, resource limits, log rotation, and a named cache volume. The settings file enables the JSON search API.</li>
+        <li>SearXNG has a private network shared with n8n, an HTTP health check, resource limits, log rotation, and a named cache volume. It runs as a non-root user with a read-only root filesystem and no Linux capabilities.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Review fixes</h2>
+      <p>Claude Opus 5.5 and an independent Codex reviewer reviewed PR #4.</p>
+      <ul>
+        <li>The quick start now keeps the 3.0.1 demo local while the owner account is created. The public ingress instructions require a patched version.</li>
+        <li>Compose leaves the model name to n8n unless the operator sets it explicitly. This preserves the upstream default and editor model selection.</li>
+        <li>The upgrade instructions explain that an existing environment file needs a new <code>SEARXNG_SECRET</code> before using the new Compose file.</li>
       </ul>
     </section>
 
@@ -46,7 +56,8 @@
         <li>Compose resolved five default services. SearXNG had zero published ports and joined only the search network. n8n joined both the default and search networks.</li>
         <li>In an isolated ARM64 Docker project, PostgreSQL and n8n passed their health checks, and the sandbox configuration reported <code>enabled=true provider=daytona</code>.</li>
         <li>A published webhook ran through the external JavaScript Code runner before and after the version upgrade. It also ran with SearXNG stopped.</li>
-        <li>SearXNG passed its health check and returned HTTP 200 with JSON from n8n. Upstream engines timed out on the test query. Live Daytona provisioning, model-backed chat, and public ngrok ingress require service credentials and remain unverified.</li>
+        <li>On a fresh 3.0.1 install, the authenticated Assistant settings API accepted a model and test credential. Its search verification returned a result through SearXNG from a local fixture engine. The default upstream search engines timed out.</li>
+        <li>A temporary ngrok HTTPS endpoint with a test Traffic Policy reached the fixture webhook and blocked editor and unauthenticated requests. The test used the local ngrok agent. The exact Compose ngrok service, live Daytona provisioning, and model-backed chat remain unverified.</li>
       </ul>
     </section>
 
@@ -54,7 +65,7 @@
       <h2>Reproduce startup</h2>
       <p>Fill in the values from <code>.env.example</code>, including a unique <code>SEARXNG_SECRET</code>. For an existing instance, review the Migration Report and back up PostgreSQL, the n8n data volume, and the encryption key before upgrading. <a href="https://github.com/n8n-io/n8n-docs/blob/main/docs/changelog/v30-breaking-changes.md">3.0 migration guidance</a></p>
       <pre><code>docker compose config --quiet
-docker compose up -d --wait
+docker compose up -d --wait n8n task-runners searxng
 docker compose ps</code></pre>
     </section>
   </main>

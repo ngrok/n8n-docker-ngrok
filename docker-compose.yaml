@@ -48,13 +48,12 @@ services:
       TZ: ${TZ:?}
 
       # Assistant uses Daytona for sandbox execution and private SearXNG for search.
-      N8N_ENABLED_MODULES: instance-ai
       N8N_INSTANCE_AI_SANDBOX_ENABLED: "true"
       N8N_INSTANCE_AI_SANDBOX_PROVIDER: daytona
       N8N_INSTANCE_AI_SANDBOX_IMAGE: daytonaio/sandbox:0.5.3-slim
       DAYTONA_API_URL: https://app.daytona.io/api
       DAYTONA_API_KEY: ${DAYTONA_API_KEY:-}
-      N8N_INSTANCE_AI_MODEL: ${N8N_INSTANCE_AI_MODEL:-anthropic/claude-opus-4-8}
+      N8N_INSTANCE_AI_MODEL:
       N8N_INSTANCE_AI_MODEL_API_KEY: ${N8N_INSTANCE_AI_MODEL_API_KEY:-}
       N8N_INSTANCE_AI_SEARXNG_URL: http://searxng:8080
 
@@ -153,6 +152,9 @@ services:
     restart: unless-stopped
     networks:
       - search
+    user: searxng
+    read_only: true
+    cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
     cpus: 1.0
@@ -160,6 +162,8 @@ services:
     pids_limit: 128
     environment:
       SEARXNG_SECRET: ${SEARXNG_SECRET:?}
+    tmpfs:
+      - /tmp:size=64m,mode=1777
     volumes:
       - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
       - searxng_cache:/var/cache/searxng

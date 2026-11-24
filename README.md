@@ -8,10 +8,10 @@ The example pins **n8n 3.0.1 early access** for the 3.0 walkthrough. Use that pi
 
 - Docker Engine 28 or later and Docker Compose 2.20.2 or later (including Compose v5).
 - Docker configured to start automatically: at sign-in with Docker Desktop, or at boot with Docker Engine on Linux.
-- An ngrok account on the free plan.
+- An ngrok account if you want public webhooks.
 - Optional: [just](https://github.com/casey/just) for running commands.
 
-## Quick start
+## Run the 3.0 demo locally
 
 1. Copy the example environment file:
 
@@ -19,7 +19,7 @@ The example pins **n8n 3.0.1 early access** for the 3.0 walkthrough. Use that pi
     cp .env.example .env
     ```
 
-2. Edit `.env` and replace every `CHANGE_ME` value. Use unique random values for all passwords, `N8N_ENCRYPTION_KEY`, `N8N_RUNNERS_AUTH_TOKEN`, and `SEARXNG_SECRET`.
+2. Edit `.env` and replace the PostgreSQL, n8n, and SearXNG `CHANGE_ME` values with distinct random values. Keep the ngrok placeholders for this local run.
 
     With `just` installed, generate a random password and copy it to the clipboard:
 
@@ -34,29 +34,26 @@ The example pins **n8n 3.0.1 early access** for the 3.0 walkthrough. Use that pi
     TZ="America/Los_Angeles"
     ```
 
-4. Get your auth token and dev domain from the ngrok dashboard, then set the ngrok variables:
-
-    ``` sh
-    NGROK_AUTHTOKEN="CHANGE_ME"
-    NGROK_PUBLIC_DOMAIN="CHANGE_ME"
-    ```
-
-5. Validate and start the stack:
+4. Validate the configuration and start the local services:
 
     ``` sh
     docker compose config --quiet
-    docker compose up -d
+    docker compose up -d --wait n8n task-runners searxng
     ```
 
-6. Open `http://localhost:5678` and create the n8n owner account. Use the ngrok URL for public webhooks and triggers rather than routine editor access.
+5. Open `http://localhost:5678` and create the n8n owner account.
 
     If Docker is running on another computer or a cloud VM, `localhost` on your computer refers to your computer, not the machine running n8n. See [How do I access n8n from another computer?](#7-how-do-i-access-the-n8n-editor-from-another-computer) below.
 
 ## Enable n8n Assistant
 
-`docker compose up -d` starts SearXNG and configures n8n to use Daytona. Fill in `DAYTONA_API_KEY` and `N8N_INSTANCE_AI_MODEL_API_KEY` in `.env` to activate Assistant. If you use a different model, set `N8N_INSTANCE_AI_MODEL` to its `provider/model` identifier. Run `docker compose up -d` again to apply the settings, then open Assistant in the editor and verify that it responds and can search the web.
+The Compose file starts SearXNG and configures n8n to use Daytona. Set `DAYTONA_API_KEY` in `.env`. To configure the model from the environment, set `N8N_INSTANCE_AI_MODEL_API_KEY` and optionally set `N8N_INSTANCE_AI_MODEL` to a `provider/model` identifier. Leave both model settings unset to choose a model and save its credential in the editor. Apply environment changes with `docker compose up -d n8n task-runners searxng`, then verify that Assistant responds and can search the web.
 
 Create the Daytona key in your Daytona account. Daytona provisions the sandbox remotely and receives workflow data that Assistant passes to it. Jobs in Code nodes still run in the local distroless task-runner container. SearXNG serves the JSON search API over a private Compose network, and the rest of n8n can start while search is unavailable. [n8n Assistant setup guide](https://github.com/n8n-io/n8n-docs/blob/main/docs/deploy/host-n8n/configure-n8n/set-up-n8n-assistant.md)
+
+## Enable public HTTPS webhooks
+
+Create the owner account locally first and upgrade to a maintained n8n release that includes the 3.2.2 security fixes. Then set `NGROK_AUTHTOKEN` and `NGROK_PUBLIC_DOMAIN` from your ngrok dashboard and run `docker compose up -d` to start all services, including ngrok. The active Traffic Policy allows editor routes. [n8n security advisories](https://github.com/n8n-io/n8n/security/advisories)
 
 ## Common commands
 
@@ -128,7 +125,9 @@ Create a backup and maintenance process that you have tested before you need it.
 
 ### Upgrade an existing 2.x instance
 
-Review **Settings → Migration Report** on a version that provides it. If your 2.x version predates the report, update to a supported 2.x release first. Back up PostgreSQL, the n8n data volume, and your encryption key, then rehearse the upgrade on a restored copy. Add `SEARXNG_SECRET` to your existing `.env`, copy any Assistant settings you need from `.env.example`, and set `N8N_VERSION` to the target tag before recreating the services. Preserve your existing database and encryption settings. [n8n 3.0 breaking changes](https://github.com/n8n-io/n8n-docs/blob/main/docs/changelog/v30-breaking-changes.md)
+Add a unique `SEARXNG_SECRET` to your existing `.env` before running any Compose commands with the new file. Compose requires it even if you keep your existing n8n version.
+
+Review **Settings → Migration Report** on a version that provides it. If your 2.x version predates the report, update to a supported 2.x release first. Back up PostgreSQL, the n8n data volume, and your encryption key, then rehearse the upgrade on a restored copy. Copy any Assistant settings you need from `.env.example` and set `N8N_VERSION` to the target tag before recreating the services. Preserve your existing database and encryption settings. [n8n 3.0 breaking changes](https://github.com/n8n-io/n8n-docs/blob/main/docs/changelog/v30-breaking-changes.md)
 
 ## Use AI to explain how this code works
 
