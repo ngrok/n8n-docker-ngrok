@@ -1,8 +1,8 @@
 # n8n with Docker Compose and ngrok
 
-A production-oriented reference for a small, single-host [n8n](https://n8n.io/) deployment, with PostgreSQL, persistent storage, isolated Code runners, and a free public HTTPS URL required for external webhooks through ngrok.
+A production-oriented reference for a small, single-host [n8n](https://n8n.io/) deployment, with PostgreSQL, isolated Code runners, n8n Assistant with managed Daytona sandboxing and private SearXNG search, and public HTTPS webhooks through ngrok.
 
-Use this repository as a starting point and adapt it to your own security, backup, and operational requirements.
+The example pins **n8n 3.0.1 early access** for the 3.0 walkthrough. Use that pin in a controlled demo. Before deploying publicly, choose a maintained version that includes the fixes n8n shipped in 3.2.2. [3.0.1 release](https://github.com/n8n-io/n8n/releases/tag/n8n%403.0.1) · [n8n security advisories](https://github.com/n8n-io/n8n/security/advisories)
 
 ## Requirements
 
@@ -19,7 +19,7 @@ Use this repository as a starting point and adapt it to your own security, backu
     cp .env.example .env
     ```
 
-2. Edit `.env` and replace every `CHANGE_ME` value. Use unique random values for all passwords, `N8N_ENCRYPTION_KEY`, and `N8N_RUNNERS_AUTH_TOKEN`.
+2. Edit `.env` and replace every `CHANGE_ME` value. Use unique random values for all passwords, `N8N_ENCRYPTION_KEY`, `N8N_RUNNERS_AUTH_TOKEN`, and `SEARXNG_SECRET`.
 
     With `just` installed, generate a random password and copy it to the clipboard:
 
@@ -52,6 +52,12 @@ Use this repository as a starting point and adapt it to your own security, backu
 
     If Docker is running on another computer or a cloud VM, `localhost` on your computer refers to your computer, not the machine running n8n. See [How do I access n8n from another computer?](#7-how-do-i-access-the-n8n-editor-from-another-computer) below.
 
+## Enable n8n Assistant
+
+`docker compose up -d` starts SearXNG and configures n8n to use Daytona. Fill in `DAYTONA_API_KEY` and `N8N_INSTANCE_AI_MODEL_API_KEY` in `.env` to activate Assistant. If you use a different model, set `N8N_INSTANCE_AI_MODEL` to its `provider/model` identifier. Run `docker compose up -d` again to apply the settings, then open Assistant in the editor and verify that it responds and can search the web.
+
+Create the Daytona key in your Daytona account. Daytona provisions the sandbox remotely and receives workflow data that Assistant passes to it. Jobs in Code nodes still run in the local distroless task-runner container. SearXNG serves the JSON search API over a private Compose network, and the rest of n8n can start while search is unavailable. [n8n Assistant setup guide](https://github.com/n8n-io/n8n-docs/blob/main/docs/deploy/host-n8n/configure-n8n/set-up-n8n-assistant.md)
+
 ## Common commands
 
 ``` sh
@@ -62,7 +68,7 @@ docker compose down        # Stop the stack
 
 ## Key implementation details
 
-This setup has four services, each with a specific job. These choices explain much of the configuration:
+The Compose stack runs ngrok, n8n, PostgreSQL, external task runners, and SearXNG.
 
 ### Public webhooks through ngrok
 
@@ -119,6 +125,10 @@ Create a backup and maintenance process that you have tested before you need it.
 - PostgreSQL only applies initialization settings when its data volume is empty. Changing a database password in `.env` does not update an existing database user.
 - Pin and test updates before applying them. Update `N8N_VERSION` only in `.env` so n8n and its task runner stay on the same version.
 - Setting `PGDATA` keeps this Compose volume path consistent, but PostgreSQL major-version upgrades still require a planned migration.
+
+### Upgrade an existing 2.x instance
+
+Review **Settings → Migration Report** on a version that provides it. If your 2.x version predates the report, update to a supported 2.x release first. Back up PostgreSQL, the n8n data volume, and your encryption key, then rehearse the upgrade on a restored copy. Add `SEARXNG_SECRET` to your existing `.env`, copy any Assistant settings you need from `.env.example`, and set `N8N_VERSION` to the target tag before recreating the services. Preserve your existing database and encryption settings. [n8n 3.0 breaking changes](https://github.com/n8n-io/n8n-docs/blob/main/docs/changelog/v30-breaking-changes.md)
 
 ## Use AI to explain how this code works
 
